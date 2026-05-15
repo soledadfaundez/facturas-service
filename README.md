@@ -1,0 +1,268 @@
+1.- Compilar:
+	facturas-service\src> dotnet restore
+	facturas-service\src> dotnet build
+	facturas-service\src> dotnet run --project Facturas.API
+	
+	Revisar: http://localhost:5080/scalar/v1
+	
+	
+2.- llamados de prueba (en power shell):
+
+# =========================================================
+# FACTURAS API - FULL TEST SCRIPT
+# =========================================================
+
+# =========================================================
+# IGNORAR CERTIFICADO HTTPS LOCAL
+# =========================================================
+
+Add-Type @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint,
+        X509Certificate certificate,
+        WebRequest request,
+        int certificateProblem) {
+        return true;
+    }
+}
+"@
+
+[System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
+
+# =========================================================
+# CONFIG
+# =========================================================
+
+$baseUrl = "http://localhost:5080"
+
+# =========================================================
+# OBTENER TOKEN JWT
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "OBTENIENDO TOKEN JWT"
+Write-Host "======================================="
+
+$tokenResponse = Invoke-RestMethod `
+    -Uri "$baseUrl/api/auth/token" `
+    -Method POST
+
+$token = $tokenResponse.access_token
+
+Write-Host ""
+Write-Host "TOKEN OBTENIDO:"
+Write-Host $token
+
+# =========================================================
+# HEADERS
+# =========================================================
+
+$headers = @{
+    Authorization = "Bearer $token"
+}
+
+# =========================================================
+# CREATE FACTURA
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "CREATE FACTURA"
+Write-Host "======================================="
+
+$createBody = @'
+{
+  "numeroDocumento": 9999,
+  "rutVendedor": 21979000,
+  "dvVendedor": "7",
+  "rutComprador": 12345678,
+  "dvComprador": "9",
+  "direccionComprador": "Direccion Test",
+  "comunaComprador": 45,
+  "regionComprador": 13,
+  "detalleFactura": [
+    {
+      "cantidadProducto": 2,
+      "producto": {
+        "descripcion": "Producto Test",
+        "valor": 5000
+      }
+    }
+  ]
+}
+'@
+
+$createResult = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas" `
+    -Method POST `
+    -Headers $headers `
+    -ContentType "application/json" `
+    -Body $createBody
+
+$createResult | ConvertTo-Json -Depth 10
+
+# =========================================================
+# GET ALL
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "GET ALL"
+Write-Host "======================================="
+
+$getAll = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas" `
+    -Method GET `
+    -Headers $headers
+
+$getAll | ConvertTo-Json -Depth 10
+
+# =========================================================
+# GET BY NUMERO DOCUMENTO 9999
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "GET BY NUMERO DOCUMENTO 9999"
+Write-Host "======================================="
+
+$getById = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/9999" `
+    -Method GET `
+    -Headers $headers
+
+$getById | ConvertTo-Json -Depth 10
+
+# =========================================================
+# GET BY NUMERO DOCUMENTO 854444 (CON ERROR NOT FOUND)
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "GET BY NUMERO DOCUMENTO 854444 (CON ERROR NOT FOUND)"
+Write-Host "======================================="
+
+$getById = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/854444" `
+    -Method GET `
+    -Headers $headers
+
+$getById | ConvertTo-Json -Depth 10
+
+# =========================================================
+# BUSQUEDA ESPECIAL AUDITOR
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "BUSQUEDA AUDITOR"
+Write-Host "======================================="
+
+$busqueda = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/busqueda?rutVendedor=21979000&page=1&size=5" `
+    -Method GET `
+    -Headers $headers
+
+$busqueda | ConvertTo-Json -Depth 10
+
+# =========================================================
+# UPDATE
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "UPDATE"
+Write-Host "======================================="
+
+$updateBody = @'
+{
+  "numeroDocumento": 9999,
+  "rutVendedor": 21979000,
+  "dvVendedor": "7",
+  "rutComprador": 12345678,
+  "dvComprador": "9",
+  "direccionComprador": "Direccion Actualizada",
+  "comunaComprador": 45,
+  "regionComprador": 13,
+  "detalleFactura": [
+    {
+      "cantidadProducto": 3,
+      "producto": {
+        "descripcion": "Producto Update",
+        "valor": 7000
+      }
+    }
+  ]
+}
+'@
+
+Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/9999" `
+    -Method PUT `
+    -Headers $headers `
+    -ContentType "application/json" `
+    -Body $updateBody
+
+Write-Host ""
+Write-Host "UPDATE OK"
+
+# =========================================================
+# GET DESPUES UPDATE
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "GET DESPUES UPDATE"
+Write-Host "======================================="
+
+$getAfterUpdate = Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/9999" `
+    -Method GET `
+    -Headers $headers
+
+$getAfterUpdate | ConvertTo-Json -Depth 10
+
+# =========================================================
+# DELETE
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "DELETE"
+Write-Host "======================================="
+
+Invoke-RestMethod `
+    -Uri "$baseUrl/api/facturas/9999" `
+    -Method DELETE `
+    -Headers $headers
+
+Write-Host ""
+Write-Host "DELETE OK"
+
+# =========================================================
+# VALIDAR DELETE
+# =========================================================
+
+Write-Host ""
+Write-Host "======================================="
+Write-Host "VALIDAR DELETE"
+Write-Host "======================================="
+
+try {
+
+    Invoke-RestMethod `
+        -Uri "$baseUrl/api/facturas/9999" `
+        -Method GET `
+        -Headers $headers
+
+}
+catch {
+
+    Write-Host ""
+    Write-Host "FACTURA ELIMINADA CORRECTAMENTE"
+}
