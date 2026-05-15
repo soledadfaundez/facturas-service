@@ -1,4 +1,5 @@
 1.- Compilar:
+	
 	facturas-service\src> dotnet restore
 	facturas-service\src> dotnet build
 	facturas-service\src> dotnet run --project Facturas.API
@@ -7,6 +8,7 @@
 	
 	
 2.- llamados de prueba (en power shell):
+
 
 # =========================================================
 # FACTURAS API - FULL TEST SCRIPT
